@@ -1,12 +1,12 @@
 import numpy as np
 import math as math
 
-import matplotlib
-#matplotlib.use("qt4agg")
 from matplotlib import pyplot as plt
 
+
 class CalculaAutovalsAutovecs:
-    def calcula_c(self, alfa, beta, i):
+    # Este método faz o cálculo dos cossenos (forma estável)
+    def __calcula_c(self, alfa, beta, i):
         if abs(alfa[i]) > abs(beta[i]):
             tau = -beta[i] / alfa[i]
             return 1 / math.sqrt(1 + tau * tau)
@@ -14,7 +14,8 @@ class CalculaAutovalsAutovecs:
             tau = -alfa[i] / beta[i]
             return tau / math.sqrt(1 + tau * tau)
 
-    def calcula_s(self, alfa, beta, i):
+    # Este método faz o cálculo dos senos (forma estável)
+    def __calcula_s(self, alfa, beta, i):
         if abs(alfa[i]) > abs(beta[i]):
             tau = -beta[i] / alfa[i]
             return tau / math.sqrt(1 + tau * tau)
@@ -22,21 +23,26 @@ class CalculaAutovalsAutovecs:
             tau = -alfa[i] / beta[i]
             return 1 / math.sqrt(1 + tau * tau)
 
-    def calcula_mu(self, alfa, beta, m, deslocamentos):
-        # Precisamos obter primeiramente dk.
-        dk = (alfa[m - 1] - alfa[m]) / 2
-        mu = alfa[m] + dk - np.sign(dk) * math.sqrt(dk ** 2 + beta[m - 1] ** 2)
+    # Este método faz o cálculo de mu
+    # m: o tamanho-1 da submatriz onde o método é aplicado
+    def __calcula_mu(self, alfa, beta, m, deslocamentos):
+        # O if abaixo detecta se foram solicitados deslocamentos espectrais
         if deslocamentos:
+            # Precisamos obter primeiramente dk.
+            dk = (alfa[m - 1] - alfa[m]) / 2
+            mu = alfa[m] + dk - np.sign(dk) * math.sqrt(dk ** 2 + beta[m - 1] ** 2)
             return mu
         else:
             return 0
 
-    def normaliza(self, vector):
+    # Este método faz a normalização de vector
+    def __normaliza(self, vector):
         soma = 0
         for i in range(0, len(vector)):
             soma = soma + vector[i] ** 2
         return vector / math.sqrt(soma)
 
+    # Este é o método público desta classe
     def AutovalAutovec(self, alfa, beta, epsilon, deslocamentos, V):
         c = np.zeros(alfa.shape[0] - 1)  # Vetor que armazena os valores de c em cada subiteração i da decomposição QR da k-ésima iteração
         s = np.zeros(alfa.shape[0] - 1)  # Vetor que armazena os valores de s em cada subiteração i da decomposição QR da k-ésima iteração
@@ -71,9 +77,8 @@ class CalculaAutovalsAutovecs:
 
             # O if só é executado se a submatriz é pelo menos 2x2 e o último beta não puder ser zerado
             if (m > 0 and abs(Subdiagonal_inferior[m - 1]) >= epsilon):
-                k = k + 1
-                if (k > 1):
-                    mu = self.calcula_mu(Diagonal_principal, Subdiagonal_inferior, m, deslocamentos)
+                if (k > 0):
+                    mu = self.__calcula_mu(Diagonal_principal, Subdiagonal_inferior, m, deslocamentos)
                     Diagonal_principal = Diagonal_principal - mu
                 # Este for faz a decomposição QR
                 #
@@ -94,8 +99,8 @@ class CalculaAutovalsAutovecs:
                 # 4. Entre cada subiteração somente 5 células importantes são alteradas no subresultado de R(k), exceto na última iteração
                 for i in range(0, m):
                     # Calcula c e s da subiteração i da decomposição QR #Otimização 1
-                    c[i] = self.calcula_c(Diagonal_principal, Subdiagonal_inferior, i)
-                    s[i] = self.calcula_s(Diagonal_principal, Subdiagonal_inferior, i)
+                    c[i] = self.__calcula_c(Diagonal_principal, Subdiagonal_inferior, i)
+                    s[i] = self.__calcula_s(Diagonal_principal, Subdiagonal_inferior, i)
 
                     # Calcula os novos valores das duas células atualizadas da diagonal principal do subresultado de R(k)
                     temp_diagonal_principal[0] = c[i] * Diagonal_principal[i] - s[i] * Subdiagonal_inferior[i]
@@ -142,8 +147,9 @@ class CalculaAutovalsAutovecs:
                     Diagonal_principal[i] = np.copy(temp_diagonal_principal[0])
                     Diagonal_principal[i + 1] = np.copy(temp_diagonal_principal[1])
                     Subdiagonal_inferior[i] = np.copy(temp_subdiagonal[0])
-                    Subdiagonal_superior[i] = np.copy(temp_subdiagonal[
-                                                          0])  # Como A(k+1) é simétrica, não precisamos calcular a subdiagonal superior #Otimização 1
+                    Subdiagonal_superior[i] = np.copy(temp_subdiagonal[0])  # Como A(k+1) é simétrica, não precisamos calcular a subdiagonal superior #Otimização 1
+
+
                 # Este for faz a multiplicação V(k+1)=V(k)*Q(k)T, e armazena o resultado em temp_V
                 #
                 # Este for realiza m subiterações subiteracao
@@ -159,9 +165,10 @@ class CalculaAutovalsAutovecs:
 
                         temp_V[linha, subiteracao] = temp_V_coluna_esquerda[linha]
                         temp_V[linha, subiteracao + 1] = temp_V_coluna_direita[linha]
-
-                if (k > 1):
+                if (k > 0):
                     Diagonal_principal = Diagonal_principal + mu
+
+                k = k + 1
 
             # print('k =', k, ', m =', m, '\nDiagonal principal:', Diagonal_principal, '\nSubdiagonal inferior:',
             #      Subdiagonal_inferior, '\nMatriz V:\n', temp_V, '\n\n')
@@ -173,13 +180,13 @@ class CalculaAutovalsAutovecs:
                 Subdiagonal_superior[m - 1] = 0.0
                 m = m - 1
 
-            # Normaliza autovetores
-            for j in range(0, alfa.shape[0]):
-                temp_V[:, j] = self.normaliza(temp_V[:, j])
+        # __normaliza autovetores
+        for j in range(0, alfa.shape[0]):
+            temp_V[:, j] = self.__normaliza(temp_V[:, j])
         return (Diagonal_principal, temp_V, k)
 
 class EstimadorDeErros:
-    def normaliza(self, vector):
+    def __normaliza(self, vector):
         soma = 0
         for i in range(0, len(vector)):
             soma = soma + vector[i] ** 2
@@ -204,7 +211,7 @@ class EstimadorDeErros:
         autovetores_reais = np.zeros((n, n))
         for j in range(0, n):
             autovetores_reais[:, j] = np.sin(np.arange(1, n + 1, 1) * (n - j) * math.pi / (n + 1))
-            autovetores_reais[:, j] = self.normaliza(autovetores_reais[:, j])
+            autovetores_reais[:, j] = self.__normaliza(autovetores_reais[:, j])
         print('Erro obtido fazendo max(abs(Autovetores_reais-Autovetores_obtidos)) = {0}\n\n'.format(np.max(abs(autovetores_reais - V))))
 
     def EstimativasErroGerais(self, n, alfa, beta, Lambda, V):
@@ -245,11 +252,12 @@ class Interface:
 
     n = 0
 
-    usar_caso_analítico = False
+    usar_caso_analitico = False
     usar_deslocamentos_espectrais = False
     epsilon = 0.000001
     V = np.identity(alfa.shape[0])
     Lambda = 0
+    k = 0
 
     calculadora = CalculaAutovalsAutovecs()
     estimadorDeErros = EstimadorDeErros()
@@ -290,7 +298,7 @@ class Interface:
             print('Resettando matriz V')
             self.V = np.identity(self.n)
             if(input('Usar caso analítico? (y/n)') == 'y'):
-                self.usar_caso_analítico = True
+                self.usar_caso_analitico = True
                 self.alfa = 2*np.ones(self.n)
                 self.beta = -1*np.ones(self.n-1)
             else:
@@ -312,17 +320,18 @@ class Interface:
             print('Erro de digitação')
             return
 
+        # Aplica o método de obtenção de autovalores e autovetores usando decomposição QR
+        self.resultados = self.calculadora.AutovalAutovec(self.alfa, self.beta, self.epsilon,
+                                                              self.usar_deslocamentos_espectrais, self.V)
+        self.Lambda = self.resultados[0]
+        self.V = self.resultados[1]
+        self.k = self.resultados[2]
         self.promptTelaResultadosCalculoAutovalsAutovecs()
 
     def promptTelaResultadosCalculoAutovalsAutovecs(self):
-        # Aplica o método de obtenção de autovalores e autovetores usando decomposição QR
-        self.resultados = self.calculadora.AutovalAutovec(self.alfa, self.beta, self.epsilon, self.usar_deslocamentos_espectrais, self.V)
-        self.Lambda = self.resultados[0]
-        self.V = self.resultados[1]
-        k = self.resultados[2]
 
         # Número de iterações necessárias
-        print('Foram necessárias {0:d} iterações'.format(k))
+        print('Foram necessárias {0:d} iterações'.format(self.k))
 
         # Menu de seleção
         print('Selecione uma opção')
@@ -362,6 +371,10 @@ class Interface:
                 self.promptEstimativasDeErro()
             else:
                 return
+        else:
+            self.estimadorDeErros.estimarErro(self.n, self.alfa, self.beta, self.Lambda, self.V, False)
+            return
+
     def promptMassaMola(self):
         print('->Selecionado modo de obtenção de resposta de sistema massa-mola')
 
@@ -380,6 +393,8 @@ class Interface:
                 self.usar_deslocamentos_espectrais = True
             else:
                 self.usar_deslocamentos_espectrais = False
+
+            self.epsilon = float(input('epsilon: ep = '))
         except:
             print('Digitação errada')
             return
@@ -450,7 +465,7 @@ class Interface:
         else:
             return
     def promptTelaResultadosMassaMola(self):
-        print('Selecione qual opção de constante de mola será usada:')
+        print('Selecione uma opção:')
         print('(0): Gerar gráfico')
         print('(1): Imprimir frequências e modos naturais')
         selecao = (input('='))
@@ -479,9 +494,9 @@ class Interface:
                 soma = soma + Y0[j] * V[i, j] * np.cos(np.sqrt(Lambda[j]) * t)
             return soma
 
-
+        tempo_de_simulacao=0
         try:
-            tempo = float(input('Digite o tempo de simulação: tempo = '))
+            tempo_de_simulacao = float(input('Digite o tempo de simulação: tempo = '))
         except:
             print('Digitação errada')
             self.gerarGrafico()
@@ -489,7 +504,7 @@ class Interface:
         plt.ion()
         plt.figure(1)
 
-        t = np.arange(0, tempo, tempo/1000)
+        t = np.arange(0, tempo_de_simulacao, tempo_de_simulacao/1000)
         for i in range(0, self.n_massas):
             plt.plot(t, xi(i, t, self.n_massas, self.V, self.Y0, self.Lambda), label='x{0:d}(t)'.format(i))
         plt.legend(handlelength=-0.4)
