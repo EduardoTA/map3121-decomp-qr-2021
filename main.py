@@ -149,6 +149,9 @@ class CalculaAutovalsAutovecs:
                     Subdiagonal_inferior[i] = np.copy(temp_subdiagonal[0])
                     Subdiagonal_superior[i] = np.copy(temp_subdiagonal[0])  # Como A(k+1) é simétrica, não precisamos calcular a subdiagonal superior #Otimização 1
 
+                # Faz A(k+1) = R(k)*Q(k)+muk*I
+                if (k > 0):
+                    Diagonal_principal = Diagonal_principal + mu
 
                 # Este for faz a multiplicação V(k+1)=V(k)*Q(k)T, e armazena o resultado em temp_V
                 #
@@ -165,8 +168,6 @@ class CalculaAutovalsAutovecs:
 
                         temp_V[linha, subiteracao] = temp_V_coluna_esquerda[linha]
                         temp_V[linha, subiteracao + 1] = temp_V_coluna_direita[linha]
-                if (k > 0):
-                    Diagonal_principal = Diagonal_principal + mu
 
                 k = k + 1
 
@@ -193,6 +194,7 @@ class EstimadorDeErros:
         return vector / math.sqrt(soma)
 
     def EstimativasErroAnalitico(self, n, Lambda, V):
+        # Calcula os autovalores reais, pela fórmula analítica, e ordena eles do maior para o menor
         autovalores_reais = 2 * (1 - np.cos(np.arange(n, 0, -1) * math.pi / (n + 1)))
         autovalores_reais = np.flip(np.sort(autovalores_reais))
 
@@ -200,6 +202,7 @@ class EstimadorDeErros:
 
         erros = np.zeros(n)
 
+        # Faz a comparação entre os autovalores reais e os obtidos pelo método QR
         print('Autovalor obtido | Autovalor real | erro')
         for i in range(0, n):
             erros[i] = math.sqrt(math.pow(autovalores_obtidos[i] - autovalores_reais[i], 2))
@@ -208,16 +211,21 @@ class EstimadorDeErros:
         print('Erro máx: ', np.max(erros))
         print('\n')
 
+        # Calcula os autovetores reais, pela fórmula analítica, montando uma matriz semelhante à V
         autovetores_reais = np.zeros((n, n))
         for j in range(0, n):
             autovetores_reais[:, j] = np.sin(np.arange(1, n + 1, 1) * (n - j) * math.pi / (n + 1))
             autovetores_reais[:, j] = self.__normaliza(autovetores_reais[:, j])
+
+        # Faz a comparação entre os autovetores reais e os obtidos pelo método QR
         print('Erro obtido fazendo max(abs(Autovetores_reais-Autovetores_obtidos)) = {0}\n\n'.format(np.max(abs(autovetores_reais - V))))
 
     def EstimativasErroGerais(self, n, alfa, beta, Lambda, V):
+        # Faz uma estimativa de erro = max(abs(matmul(Q,QT)-I))
         erro = np.max(np.abs(np.matmul(V, np.transpose(V)) - np.identity(n)))
         print('max(abs(matmul(Q,QT)-I)) = {0}'.format(erro))
 
+        # Faz uma estimativa de erro = max(abs(matmul(A,Q)-matmul(Q,L)))
         A = np.zeros((n, n))
 
         for i in range(0, n):
@@ -232,12 +240,15 @@ class EstimadorDeErros:
             L[i, i] = Lambda[i]
 
         erro = np.max(np.abs(np.matmul(A, V) - np.matmul(V, L)))
-        print('max(abs(matmul(A,Q)-matmul(Q,Lambda))) = {0}\n'.format(erro))
+        print('max(abs(matmul(A,Q)-matmul(Q,L))) = {0}\n'.format(erro))
 
+        # Faz uma estimativa de erro comparando (A*v)/v, com os autovalores obtidos
         erros = np.zeros(n)
         for i in range(0, n):
             erros[i] = math.sqrt(math.pow(np.mean(np.divide(np.matmul(A, V[:, i]), V[:, i])) - Lambda[i], 2))
-            print('Autovalor obtido fazendo matdiv(matmul(A,v),v): {0:12.10f},  Autovalor obtido pelo método QR: {1:12.10f}, erro: {2}'.format(np.mean(np.divide(np.matmul(A, V[:, i]), V[:, i])), Lambda[i], erros[i]))
+            print('Autovalor obtido fazendo matdiv(matmul(A,v),v): {0:12.10f},'
+                  '  Autovalor obtido pelo método QR: {1:12.10f}, erro: {2}'
+                  .format(np.mean(np.divide(np.matmul(A, V[:, i]), V[:, i])), Lambda[i], erros[i]))
         print('Erro máximo = {0}\n'.format(np.max(erros)))
 
     def estimarErro(self, n, alfa, beta, Lambda, V, mostrar_erro_caso_analitico):
@@ -270,6 +281,7 @@ class Interface:
     Y0 = np.zeros(n_massas)
     ki = np.zeros(n_massas+1)
 
+    # Esta é a primeira tela vista pelo usuário
     def promptTelaInicial(self):
         # Menu de seleção inicial
         print('Selecione uma opção')
@@ -279,18 +291,18 @@ class Interface:
         selecao = input('=')
 
         if(selecao == '0'):
-            self.promptCalcularAutovalsAutovecs()
+            self.__promptCalcularAutovalsAutovecs()
             print('->Saindo...')
             self.promptTelaInicial()
         elif(selecao == '1'):
-            self.promptMassaMola()
+            self.__promptMassaMola()
             print('->Saindo...')
             self.promptTelaInicial()
         else:
             print('->Saindo...')
             return
 
-    def promptCalcularAutovalsAutovecs(self):
+    def __promptCalcularAutovalsAutovecs(self):
         print('->Selecionado modo de cálculo de autovalores e autovetores') #Confirmação de seleção
 
         try:
@@ -326,9 +338,9 @@ class Interface:
         self.Lambda = self.resultados[0]
         self.V = self.resultados[1]
         self.k = self.resultados[2]
-        self.promptTelaResultadosCalculoAutovalsAutovecs()
+        self.__promptTelaResultadosCalculoAutovalsAutovecs()
 
-    def promptTelaResultadosCalculoAutovalsAutovecs(self):
+    def __promptTelaResultadosCalculoAutovalsAutovecs(self):
 
         # Número de iterações necessárias
         print('Foram necessárias {0:d} iterações'.format(self.k))
@@ -341,20 +353,20 @@ class Interface:
         selecao = input('=')
 
         if(selecao == '0'):
-            self.mostrarAutovalsAutovecs()
-            self.promptTelaResultadosCalculoAutovalsAutovecs()
+            self.__mostrarAutovalsAutovecs()
+            self.__promptTelaResultadosCalculoAutovalsAutovecs()
         elif(selecao == '1'):
-            self.promptEstimativasDeErro()
-            self.promptTelaResultadosCalculoAutovalsAutovecs()
+            self.__promptEstimativasDeErro()
+            self.__promptTelaResultadosCalculoAutovalsAutovecs()
         else:
             return
 
-    def mostrarAutovalsAutovecs(self):
+    def __mostrarAutovalsAutovecs(self):
         for i in range(0, self.alfa.shape[0]):
             np.set_printoptions(formatter={'float': '{: 12.10f}'.format})
             print('Autovalor: {0:12.10f}, Autovetor:'.format(self.Lambda[i]), self.V[:, i])
 
-    def promptEstimativasDeErro(self):
+    def __promptEstimativasDeErro(self):
         # Porém se for detectada matriz com solução analítica, outro menu surge
         if (np.array_equal(self.alfa, 2 * np.ones(self.n)) and np.array_equal(self.beta, -1 * np.ones(self.n - 1))):
             print('Selecione uma opção')
@@ -365,17 +377,17 @@ class Interface:
 
             if(selecao == '0'):
                 self.estimadorDeErros.estimarErro(self.n, self.alfa, self.beta, self.Lambda, self.V, False)
-                self.promptEstimativasDeErro()
+                self.__promptEstimativasDeErro()
             elif(selecao == '1'):
                 self.estimadorDeErros.estimarErro(self.n, self.alfa, self.beta, self.Lambda, self.V, True)
-                self.promptEstimativasDeErro()
+                self.__promptEstimativasDeErro()
             else:
                 return
         else:
             self.estimadorDeErros.estimarErro(self.n, self.alfa, self.beta, self.Lambda, self.V, False)
             return
 
-    def promptMassaMola(self):
+    def __promptMassaMola(self):
         print('->Selecionado modo de obtenção de resposta de sistema massa-mola')
 
         try:
@@ -398,9 +410,9 @@ class Interface:
         except:
             print('Digitação errada')
             return
-        self.promptMenuMassaMola()
+        self.__promptMenuMassaMola()
 
-    def promptMenuMassaMola(self):
+    def __promptMenuMassaMola(self):
         print('Selecione qual opção de constante de mola será usada:')
         print('(0): ki = (40+2i)')
         print('(1): ki = (40+2(-1)^i)')
@@ -413,11 +425,11 @@ class Interface:
         if(selecao == '0'):
             print('Seleção 0')
             self.ki = 40 + 2 * np.arange(1, self.n_massas + 2)
-            self.promptMenuMassaMola()
+            self.__promptMenuMassaMola()
         elif(selecao == '1'):
             print('Seleção 1')
             self.ki = 40 + 2 * (-1) ** np.arange(1, self.n_massas + 2)
-            self.promptMenuMassaMola()
+            self.__promptMenuMassaMola()
         elif(selecao == '2'):
             print('Seleção 2')
             print('Digitar as condições iniciais (X0):')
@@ -429,7 +441,7 @@ class Interface:
                     raise Exception()
             except:
                 print('Digitação errada')
-            self.promptMenuMassaMola()
+            self.__promptMenuMassaMola()
         elif(selecao == '3'):
             print('Seleção 3')
             print('Digitar as constantes de mola (ki):')
@@ -442,7 +454,7 @@ class Interface:
                     raise Exception()
             except:
                 print('Digitação errada')
-            self.promptMenuMassaMola()
+            self.__promptMenuMassaMola()
         elif(selecao == '4'):
             self.alfa = np.ones(self.n_massas)
             self.beta = np.ones(self.n_massas - 1)
@@ -460,28 +472,28 @@ class Interface:
 
             print(self.resultados[0])
 
-            self.promptTelaResultadosMassaMola()
-            self.promptMenuMassaMola()
+            self.__promptTelaResultadosMassaMola()
+            self.__promptMenuMassaMola()
         else:
             return
-    def promptTelaResultadosMassaMola(self):
+    def __promptTelaResultadosMassaMola(self):
         print('Selecione uma opção:')
         print('(0): Gerar gráfico')
         print('(1): Imprimir frequências e modos naturais')
         selecao = (input('='))
 
         if(selecao == '0'):
-            self.gerarGrafico()
-            self.promptTelaResultadosMassaMola()
+            self.__gerarGrafico()
+            self.__promptTelaResultadosMassaMola()
         elif(selecao == '1'):
             for i in range(0, self.n_massas):
                 np.set_printoptions(formatter={'float': '{: 12.10f}'.format})
                 print('freq: {0:12.10f}, Modo natural:'.format(math.sqrt(self.Lambda[i])), self.V[:,i])
-            self.promptTelaResultadosMassaMola()
+            self.__promptTelaResultadosMassaMola()
         else:
             print('->Saindo...')
             return
-    def gerarGrafico(self):
+    def __gerarGrafico(self):
         for i in range(0, self.n_massas):
             soma = 0
             for j in range(0, self.n_massas):
@@ -499,7 +511,7 @@ class Interface:
             tempo_de_simulacao = float(input('Digite o tempo de simulação: tempo = '))
         except:
             print('Digitação errada')
-            self.gerarGrafico()
+            self.__gerarGrafico()
 
         plt.ion()
         plt.figure(1)
