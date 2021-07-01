@@ -342,7 +342,7 @@ class Interface:
             self.V = np.identity(self.n)
 
             # Pergunta ao usuário se quer que o programa gere automaticamente alfa e beta para caso analítico
-            if(input('Usar caso analítico? (y/n)') == 'y'):
+            if(input('Usar caso com solução analítica? (y/n)') == 'y'):
                 self.usar_caso_analitico = True
                 self.alfa = 2*np.ones(self.n)
                 self.beta = -1*np.ones(self.n-1)
